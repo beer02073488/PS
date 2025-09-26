@@ -1,0 +1,293 @@
+// อ้างอิง : https://www.youtube.com/@Pormodtanoy/videos
+
+function doGet() {
+  var html = HtmlService.createHtmlOutputFromFile('index')
+    .setTitle('ระบบจัดการยอดขาย')
+    .setFaviconUrl('https://img2.pic.in.th/pic/LOGO-pormodtanoy-V.2.png')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+
+  // เพิ่มสคริปต์เริ่มต้นเพื่อโหลดข้อมูลทันทีที่หน้าโหลด
+  var script = `
+    <script>
+      window.addEventListener('DOMContentLoaded', function() {
+        google.script.run
+          .withSuccessHandler(function(response) {
+            if (Array.isArray(response)) {
+              renderDataTable(response);
+              updateSummaryCards(response);
+            }
+          })
+          .getAllData();
+      });
+    </script>
+  `;
+
+  html.append(script);
+  return html;
+}
+
+
+//============================ ฟังก์ชันดึงข้อมูล (ถ้ามี) =================================
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+//============================ ฟังก์ชันสำหรับบันทึกข้อมูล =================================
+function saveData(data) {
+  try {
+    const sheetId = "xxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    const sheet = SpreadsheetApp.openById(sheetId).getSheetByName("data");
+
+    // คำนวณค่าอื่นๆ
+    const totalSales = parseFloat(data.salesAmount) || 0;
+    const totalCost = parseFloat(data.cost) || 0;
+    const costToSalesRatio = totalCost > 0 ? (totalCost / totalSales * 100).toFixed(2) + "%" : "0%";
+    const roi = totalSales > 0 ? (((totalSales - totalCost) / totalCost) * 100).toFixed(2) + "%" : "N/A";
+    const timestamp = new Date();
+
+    // เพิ่มข้อมูลลงในแผ่นงาน
+    sheet.appendRow([
+      timestamp,
+      data.platform,
+      data.linkName,
+      data.quantity,
+      data.unitPrice,
+      totalSales,
+      data.totalAmount || data.salesAmount,
+      totalCost,
+      costToSalesRatio,
+      roi
+    ]);
+
+    // ดึงข้อมูลทั้งหมดกลับมาเพื่อส่งคืน
+    return getAllDataForReturn();
+
+  } catch (error) {
+    return {
+      success: false,
+      error: "เกิดข้อผิดพลาดในการบันทึกข้อมูล",
+      details: error.message,
+      stack: error.stack
+    };
+  }
+}
+
+
+//============================ ฟังก์ชันสำหรับอัปเดตข้อมูล =================================
+
+function updateData(data) {
+  try {
+    const sheetId = "1klfxhGAcixaRBzKOJ0LUcI7Wz2kO3Bt6JdDs7Pnf3gc";
+    const sheet = SpreadsheetApp.openById(sheetId).getSheetByName("data");
+
+    const rowIndex = parseInt(data.rowIndex) + 2;
+
+    if (sheet.getLastRow() >= rowIndex) {
+      const range = sheet.getRange(rowIndex, 1, 1, 10);
+      const values = range.getValues()[0];
+
+      values[1] = data.platform;
+      values[2] = data.linkName;
+      values[3] = data.quantity;
+      values[4] = data.unitPrice;
+      values[5] = data.salesAmount;
+      values[6] = data.totalAmount || data.salesAmount;
+      values[7] = data.cost;
+
+      const totalSales = parseFloat(data.salesAmount) || 0;
+      const totalCost = parseFloat(data.cost) || 0;
+      values[8] = totalCost > 0 ? (totalCost / totalSales * 100).toFixed(2) + "%" : "0%";
+      values[9] = totalSales > 0 ? (((totalSales - totalCost) / totalCost) * 100).toFixed(2) + "%" : "N/A";
+
+      range.setValues([values]);
+    }
+
+    // ดึงข้อมูลทั้งหมดกลับมาเพื่อส่งคืน
+    return getAllDataForReturn();
+
+  } catch (error) {
+    return {
+      success: false,
+      error: "เกิดข้อผิดพลาดในการอัปเดตข้อมูล",
+      details: error.message,
+      stack: error.stack
+    };
+  }
+}
+
+
+//============================ ฟังก์ชันสำหรับดึงข้อมูลทั้งหมดเพื่อส่งคืน =================================
+
+function getAllDataForReturn() {
+  try {
+    const sheetId = "1klfxhGAcixaRBzKOJ0LUcI7Wz2kO3Bt6JdDs7Pnf3gc";
+    const sheet = SpreadsheetApp.openById(sheetId).getSheetByName("data");
+
+    const lastRow = sheet.getLastRow();
+    let data = [];
+
+    if (lastRow > 1) {
+      data = sheet.getRange(2, 1, lastRow - 1, 10).getValues();
+    }
+
+    const result = data.map((row, index) => {
+      return {
+        id: index,
+        timestamp: row[0] instanceof Date ? row[0].toString() : row[0],
+        platform: row[1],
+        linkName: row[2],
+        quantity: row[3],
+        unitPrice: row[4],
+        salesAmount: row[5],
+        totalAmount: row[6],
+        cost: row[7],
+        costToSalesRatio: row[8],
+        roi: row[9]
+      };
+    });
+
+    // ส่งคืนข้อมูลในรูปแบบ array เพื่อให้ client-side เข้าใจ
+    return result;
+
+  } catch (error) {
+    return {
+      success: false,
+      error: "เกิดข้อผิดพลาดในการดึงข้อมูล",
+      details: error.message,
+      stack: error.stack
+    };
+  }
+}
+
+// ฟังก์ชันสำหรับดึงข้อมูลทั้งหมด (แก้ไข)
+function getAllData() {
+  return getAllDataForReturn();
+}
+
+
+//============================ ฟังก์ชันสำหรับลบข้อมูล =================================
+
+function deleteRow(data) {
+  try {
+    const sheetId = "1klfxhGAcixaRBzKOJ0LUcI7Wz2kO3Bt6JdDs7Pnf3gc";
+    const sheet = SpreadsheetApp.openById(sheetId).getSheetByName("data");
+
+    const rowIndex = parseInt(data.rowIndex) + 2; // +2 เพราะข้อมูลเริ่มที่แถวที่ 2
+
+    if (sheet.getLastRow() >= rowIndex) {
+      sheet.deleteRow(rowIndex);
+    }
+
+    // ส่งคืนข้อมูลใหม่หลังจากลบ
+    return getAllData();
+
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      stack: error.stack
+    };
+  }
+}
+
+
+//============================ ฟังก์ชันสำหรับอัปเดตข้อมูล =================================
+
+function updateData(data) {
+  try {
+    const sheetId = "1klfxhGAcixaRBzKOJ0LUcI7Wz2kO3Bt6JdDs7Pnf3gc";
+    const sheet = SpreadsheetApp.openById(sheetId).getSheetByName("data");
+
+    const rowIndex = parseInt(data.rowIndex) + 2;
+
+    if (sheet.getLastRow() >= rowIndex) {
+      const range = sheet.getRange(rowIndex, 1, 1, 10);
+      const values = range.getValues()[0];
+
+      values[1] = data.platform;
+      values[2] = data.linkName;
+      values[3] = data.quantity;
+      values[4] = data.unitPrice;
+      values[5] = data.salesAmount;
+      values[6] = data.totalAmount || data.salesAmount;
+      values[7] = data.cost;
+
+      const totalSales = parseFloat(data.salesAmount) || 0;
+      const totalCost = parseFloat(data.cost) || 0;
+      values[8] = totalCost > 0 ? (totalCost / totalSales * 100).toFixed(2) + "%" : "0%";
+      values[9] = totalSales > 0 ? (((totalSales - totalCost) / totalCost) * 100).toFixed(2) + "%" : "N/A";
+
+      range.setValues([values]);
+    }
+
+    return getAllData();
+
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      stack: error.stack
+    };
+  }
+}
+
+//============================  ฟังก์ชันสำหรับล้างข้อมูลทั้งหมด =================================
+//
+function clearAllData() {
+  try {
+    const sheetId = "1klfxhGAcixaRBzKOJ0LUcI7Wz2kO3Bt6JdDs7Pnf3gc";
+    const sheet = SpreadsheetApp.openById(sheetId).getSheetByName("data");
+
+    // ลบข้อมูลทั้งหมด แต่เก็บหัวข้อคอลัมน์ไว้
+    if (sheet.getLastRow() > 1) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      message: "ล้างข้อมูลสำเร็จ"
+    })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({
+      error: "เกิดข้อผิดพลาดในการล้างข้อมูล",
+      details: error.message
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+
+//============================ ฟังก์ชันสำหรับตั้งค่าหัวข้อคอลัมน์ (ให้รันครั้งเดียวเพื่อสร้างโครงสร้าง) =================================
+// 
+function setupSheet() {
+  const sheetId = "1klfxhGAcixaRBzKOJ0LUcI7Wz2kO3Bt6JdDs7Pnf3gc";
+  const ss = SpreadsheetApp.openById(sheetId);
+
+  // สร้างแผ่นงาน "data" ถ้ายังไม่มี
+  let sheet = ss.getSheetByName("data");
+  if (!sheet) {
+    sheet = ss.insertSheet("data");
+  }
+
+  // ตั้งค่าหัวข้อคอลัมน์
+  sheet.getRange(1, 1, 1, 10).setValues([[
+    "Timestamp",
+    "Platform",
+    "Link Name",
+    "Quantity",
+    "Unit Price",
+    "Sales Amount",
+    "Total Amount",
+    "Cost",
+    "Cost/Sales Ratio",
+    "ROI"
+  ]]);
+
+  // ตั้งค่ารูปแบบหัวข้อ
+  sheet.getRange(1, 1, 1, 10).setFontWeight("bold");
+  sheet.getRange(1, 1, 1, 10).setBackground("#f0f0f0");
+
+  // แจ้งเตือนเมื่อตั้งค่าเสร็จ
+  SpreadsheetApp.getUi().alert("ตั้งค่าแผ่นงาน 'data' เสร็จสิ้น");
+}
