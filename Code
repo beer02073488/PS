@@ -36,7 +36,7 @@ function include(filename) {
 //============================ ฟังก์ชันสำหรับบันทึกข้อมูล =================================
 function saveData(data) {
   try {
-    const sheetId = "xxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    const sheetId = "1klfxhGAcixaRBzKOJ0LUcI7Wz2kO3Bt6JdDs7Pnf3gc";
     const sheet = SpreadsheetApp.openById(sheetId).getSheetByName("data");
 
     // คำนวณค่าอื่นๆ
