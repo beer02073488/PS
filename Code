@@ -1,7 +1,7 @@
 // อ้างอิง : https://www.youtube.com/@Pormodtanoy/videos
 
 function doGet() {
-  var html = HtmlService.createHtmlOutputFromFile('index')
+  var html = HtmlService.createHtmlOutputFromFile('Index')
     .setTitle('ระบบจัดการยอดขาย')
     .setFaviconUrl('https://img2.pic.in.th/pic/LOGO-pormodtanoy-V.2.png')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
